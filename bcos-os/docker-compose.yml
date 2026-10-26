@@ -4,10 +4,20 @@ services:
   app_proxy:
     environment:
       APP_HOST: bcos-os_web_1
-      APP_PORT: 80
+      APP_PORT: 3000
 
   web:
-    image: nginx:1.27-alpine
+    # Stock image, nothing to build: server.js and www/ come from the app
+    # folder, mounted read-only. Your data lives in ./data.
+    image: node:22.11.0-alpine
+    user: "1000:1000"
+    init: true
     restart: on-failure
+    working_dir: /app
+    command: ["node", "/app/server.js"]
+    environment:
+      PORT: "3000"
+      DATA_DIR: /data
     volumes:
-      - ${APP_DATA_DIR}/www:/usr/share/nginx/html:ro
+      - ${APP_DATA_DIR}:/app:ro
+      - ${APP_DATA_DIR}/data:/data

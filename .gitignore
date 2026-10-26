@@ -1,0 +1,3 @@
+bcos-os/data/*
+!bcos-os/data/.gitkeep
+.DS_Store
