@@ -2,7 +2,7 @@ manifestVersion: 1
 id: bcos-os
 category: utilities
 name: BCOS
-version: "0.2.0"
+version: "0.3.0"
 tagline: Your personal OS, running on Umbrel
 description: >-
   BCOS is a personal operating environment that runs as an Umbrel app: a
@@ -10,12 +10,10 @@ description: >-
   calendar, tasks, notes, journal and mail. Everything you write is stored on
   your Umbrel and syncs to every device you open it on.
 releaseNotes: >-
-  The first real build of BCOS. A home screen with widgets, a dock and search,
-  plus Calendar (day, week and month views, repeating events, calendar feeds),
-  Tasks (lists, priorities, subtasks, board view and habits), Notes (folders,
-  rich formatting, checklists, tags), Journal (daily entries with mood) and
-  Mail (a local mailbox; account sync comes later). Data now lives on the
-  Umbrel instead of in the browser.
+  Apps now open fullscreen with a Windows-style taskbar: Start, search,
+  running apps you can switch between, minimise and close, and a clock. Mail
+  connects to real accounts — iCloud, Gmail, Yahoo, Fastmail or any IMAP/SMTP
+  server — to read, organise and send your email from BCOS.
 developer: Beckett Clarke
 website: ""
 dependencies: []

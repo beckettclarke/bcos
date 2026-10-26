@@ -10,6 +10,7 @@ import { IconButton, toast, useNarrow, openMenu, confirm } from '../ui/component
 import { useSettings } from '../lib/store.js';
 import { RichEditor, digest, toMarkdown } from './editor.js';
 import { MOODS, ACTIVITIES, promptFor, journalStats, hasContent } from './journal-shared.js';
+import { os } from '../shell/os.js';
 
 const entryHtml = (e) => e?.html ?? (e?.text ? e.text.split(/\n{2,}/).map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`).join('') : '');
 
@@ -35,6 +36,7 @@ export default function JournalApp({ intent, nonce }) {
 
   useEffect(() => {
     const onKey = (e) => {
+      if (os.app !== 'journal') return; // running in the background
       if (isTyping(e) || e.metaKey || e.ctrlKey || document.querySelector('.popover')) return;
       if (e.key === 'ArrowLeft') go(-1);
       else if (e.key === 'ArrowRight') go(1);

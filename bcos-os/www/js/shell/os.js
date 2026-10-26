@@ -1,15 +1,27 @@
-// Which app is open, where it was opened from, and what it was asked to do.
-// Anything (dock, widgets, search, another app) opens apps through here.
+// Which apps are running, which one is in front, where it was opened from,
+// and what it was asked to do. Anything (taskbar, widgets, search, another
+// app) opens apps through here.
+//
+// Like a desktop OS, apps keep running when you switch away: `running` is the
+// taskbar order, `app` is the one on screen (null shows the home screen).
 
 import { useEffect, useReducer } from '../lib/html.js';
 
-export const os = { app: null, intent: null, origin: null, spotlight: false, nonce: 0 };
+export const os = { app: null, running: [], intent: null, origin: null, spotlight: false, start: false, nonce: 0 };
 const listeners = new Set();
-const emit = () => listeners.forEach((fn) => fn());
+let version = 0;
+const emit = () => { version++; listeners.forEach((fn) => fn()); };
 
 export function useOS() {
   const [, force] = useReducer((x) => x + 1, 0);
-  useEffect(() => { listeners.add(force); return () => listeners.delete(force); }, []);
+  const seen = version;
+  useEffect(() => {
+    listeners.add(force);
+    // Catch up on anything that changed between render and subscribing
+    // (e.g. a back/forward navigation while BCOS was still booting).
+    if (version !== seen) force();
+    return () => listeners.delete(force);
+  }, []);
   return os;
 }
 
@@ -19,33 +31,66 @@ const rectOf = (el) => {
   return r.width ? { left: r.left, top: r.top, width: r.width, height: r.height } : null;
 };
 
+function syncHash() {
+  const want = os.app ? `#/${os.app}` : '';
+  if (location.hash === want) return;
+  if (want) history.pushState(null, '', want);
+  else history.pushState(null, '', location.pathname + location.search);
+}
+
 /**
- * Open an app. `from` is the element it should grow out of; without one it
- * grows out of its dock icon. `intent` is passed to the app ({ type, ... }).
+ * Open (or bring to front) an app. `from` is the element it should grow out
+ * of; without one it grows out of its taskbar button. `intent` is passed to
+ * the app ({ type, ... }).
  */
 export function openApp(id, intent = null, from = null) {
-  const wasOpen = os.app;
-  os.origin = rectOf(from) || (wasOpen ? os.origin : rectOf(document.querySelector(`[data-dock-app="${id}"] .dock-icon`)));
+  os.origin = rectOf(from) || rectOf(document.querySelector(`[data-dock-app="${id}"]`));
+  if (!os.running.includes(id)) os.running = [...os.running, id];
   os.app = id;
   os.intent = intent;
   os.nonce++;
   os.spotlight = false;
-  if (location.hash !== `#/${id}`) history.pushState(null, '', `#/${id}`);
+  os.start = false;
+  syncHash();
   emit();
 }
 
-export function closeApp() {
+/** Send the front app to the taskbar and show the home screen. */
+export function minimizeApp() {
   if (!os.app) return;
+  os.origin = rectOf(document.querySelector(`[data-dock-app="${os.app}"]`));
   os.app = null;
   os.intent = null;
-  if (location.hash) history.pushState(null, '', location.pathname + location.search);
+  syncHash();
   emit();
+}
+
+/** Quit an app (the front one by default). */
+export function closeApp(id = os.app) {
+  if (!id) return;
+  os.running = os.running.filter((x) => x !== id);
+  if (os.app === id) { os.app = null; os.intent = null; }
+  syncHash();
+  emit();
+}
+
+/** Taskbar click: open, bring forward, or minimise if already in front. */
+export function toggleApp(id, from) {
+  if (os.app === id) minimizeApp();
+  else openApp(id, null, from);
 }
 
 /** Open or close search. `seed` is a first character typed on the home screen. */
 export function setSpotlight(open, seed = '') {
   os.spotlight = open;
   os.spotlightSeed = open ? seed : '';
+  if (open) os.start = false;
+  emit();
+}
+
+export function setStart(open) {
+  os.start = open;
+  if (open) os.spotlight = false;
   emit();
 }
 
@@ -57,7 +102,9 @@ export function appFromHash() {
 window.addEventListener('popstate', () => {
   const id = appFromHash();
   if (id === os.app) return;
-  if (id) { os.app = id; os.intent = null; os.nonce++; }
-  else { os.app = null; os.intent = null; }
+  if (id) {
+    if (!os.running.includes(id)) os.running = [...os.running, id];
+    os.app = id; os.intent = null; os.nonce++;
+  } else { os.app = null; os.intent = null; }
   emit();
 });

@@ -9,6 +9,7 @@ import { cx, uid, plural, isTyping, clamp } from '../lib/util.js';
 import { startDrag, orderAt } from '../lib/dnd.js';
 import { Icon } from '../ui/icons.js';
 import { Popover, Segmented, IconButton, openMenu, openContextMenu, confirm, toast, useNarrow, useEscape, ColorDots, AutoTextarea, EmptyState, useDraft } from '../ui/components.js';
+import { os } from '../shell/os.js';
 
 const COMPLETE_DELAY = 900;
 
@@ -203,6 +204,7 @@ export default function TasksApp({ intent, nonce }) {
   // --- keyboard ---
   useEffect(() => {
     const onKey = (e) => {
+      if (os.app !== 'tasks') return; // running in the background
       if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey || document.querySelector('.popover, .spotlight')) return;
       const idx = flat.findIndex((t) => t.id === selectedId);
       const cur = flat[idx];

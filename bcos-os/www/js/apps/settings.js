@@ -21,7 +21,8 @@ const TABS = [
 const SHORTCUTS = [
   ['Search everything', `${modKey} K`],
   ['Open Settings', `${modKey} ,`],
-  ['Close the app', 'Esc'],
+  ['Minimise the app', 'Esc'],
+  ['Start menu', 'Ctrl Esc'],
   ['Calendar: today / day / week / month', 'T · D · W · M'],
   ['Calendar: new event', 'N'],
   ['Tasks: new task / complete', 'N · Space'],

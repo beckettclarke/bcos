@@ -4,8 +4,13 @@
     {
       "name": "bcos-dev",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["bcos-os/server.js"],
-      "port": 5317
+      "runtimeArgs": [
+        "bcos-os/server.js"
+      ],
+      "port": 5317,
+      "env": {
+        "PORT": "5317"
+      }
     }
   ]
 }

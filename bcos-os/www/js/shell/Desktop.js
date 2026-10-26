@@ -1,26 +1,14 @@
-// The home screen: greeting, widgets, app grid, the search pill and status.
+// The home screen: greeting, widgets and the app grid.
 
-import { html, useMemo } from '../lib/html.js';
-import { useSettings, useCollection, useStatus } from '../lib/store.js';
-import { greeting, todayKey, fmt, fmtTime } from '../lib/date.js';
-import { cx, modKey } from '../lib/util.js';
-import { Icon, BcosMark } from '../ui/icons.js';
+import { html } from '../lib/html.js';
+import { useSettings } from '../lib/store.js';
+import { greeting } from '../lib/date.js';
+import { BcosMark } from '../ui/icons.js';
 import { useTick } from '../ui/components.js';
 import { APPS } from './apps.js';
-import { openApp, setSpotlight } from './os.js';
+import { openApp } from './os.js';
 import { Widget } from './widgets.js';
-
-export function useBadges() {
-  const mail = useCollection('mail');
-  const tasks = useCollection('tasks');
-  return useMemo(() => {
-    const today = todayKey();
-    return {
-      mail: mail.filter((m) => m.mailbox === 'inbox' && !m.read).length,
-      tasks: tasks.filter((t) => !t.done && t.due && t.due <= today).length,
-    };
-  }, [mail, tasks]);
-}
+import { useBadges } from './Taskbar.js';
 
 function AppTile({ app, index, badge }) {
   return html`<button class="app-tile rise" style=${{ '--d': 5 + index * 0.6 }}
@@ -49,28 +37,5 @@ export function Desktop() {
     <nav class="app-grid" aria-label="Apps">
       ${APPS.map((app, i) => html`<${AppTile} key=${app.id} app=${app} index=${i} badge=${badges[app.id]} />`)}
     </nav>
-  </div>`;
-}
-
-export function SearchPill() {
-  return html`<button class="search-pill rise" style=${{ '--d': 9 }} onClick=${() => setSpotlight(true)} aria-label="Search">
-    <span class="search-pill-orb" />
-    <span>Search</span>
-    <kbd>${modKey}K</kbd>
-  </button>`;
-}
-
-export function StatusBar() {
-  useTick(15000);
-  const st = useStatus();
-  const now = new Date();
-  let icon = 'cloud-check', label = 'Synced to your Umbrel', tone = '';
-  if (st.mode === 'local') { icon = 'database'; label = 'Saved in this browser only'; tone = 'muted'; }
-  else if (st.authLost) { icon = 'lock'; label = 'Signed out of Umbrel — reload to sign in'; tone = 'warn'; }
-  else if (!st.online) { icon = 'cloud-off'; label = 'Offline — changes will sync when the Umbrel is back'; tone = 'warn'; }
-  else if (st.syncing) { icon = 'cloud'; label = 'Syncing…'; }
-  return html`<div class="statusbar">
-    <span class=${cx('status-sync', tone && `is-${tone}`)} title=${label} aria-label=${label}><${Icon} name=${icon} size=${15} /></span>
-    <span class="status-clock">${fmt(now, 'weekdayMonthDay')}<b>${fmtTime(now)}</b></span>
   </div>`;
 }

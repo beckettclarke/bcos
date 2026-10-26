@@ -5,7 +5,7 @@ import { boot } from './lib/store.js';
 import { seed } from './lib/seed.js';
 import { refreshStaleFeeds } from './lib/feeds.js';
 import { App } from './shell/App.js';
-import { preloadApps } from './shell/Sheet.js';
+import { preloadApps } from './shell/Windows.js';
 import { appFromHash, openApp } from './shell/os.js';
 import { appById } from './shell/apps.js';
 

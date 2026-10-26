@@ -126,6 +126,33 @@ export function putMany(name, items, { touch = true } = {}) {
   flushSoon();
 }
 
+/**
+ * Apply items the server has already stored (e.g. mail it synced) without
+ * queueing them to be written back.
+ */
+export function absorb(name, upserts = [], removals = []) {
+  const c = col(name);
+  for (const item of upserts) if (item && item.id) c.set(item.id, item);
+  for (const id of removals) c.delete(id);
+  if (upserts.length || removals.length) emit(name);
+}
+
+/** Call a JSON endpoint on the BCOS server. Throws with the server's message. */
+export async function api(path, { method = 'GET', body, timeout = 30000 } = {}) {
+  if (status.mode !== 'server') throw new Error('This needs the BCOS server running on your Umbrel');
+  let res;
+  try {
+    res = await request(`api/${path}`, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined }, timeout);
+  } catch (err) {
+    if (err instanceof AuthLost) throw new Error('Signed out of Umbrel — reload to sign in');
+    throw new Error(err.name === 'AbortError' ? 'That took too long — try again' : 'Couldn’t reach your Umbrel');
+  }
+  let data = null;
+  try { data = await res.json(); } catch {}
+  if (!res.ok) throw Object.assign(new Error(data?.error || `Something went wrong (${res.status})`), { status: res.status });
+  return data;
+}
+
 // --- settings --------------------------------------------------------------
 
 export function settings() {

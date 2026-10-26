@@ -18,6 +18,7 @@ const path = require('node:path');
 const os = require('node:os');
 const zlib = require('node:zlib');
 const crypto = require('node:crypto');
+const { createMail } = require('./mail.js');
 
 const PORT = Number(process.env.PORT || 3000);
 const APP_DIR = __dirname;
@@ -317,9 +318,12 @@ async function api(req, res, pathname, query) {
     for (const name of collections.keys()) { collections.set(name, {}); markDirty(name); }
     await fsp.rm(FILES_DIR, { recursive: true, force: true });
     fs.mkdirSync(FILES_DIR, { recursive: true });
+    await mail.reset();
     fresh = true;
     return json(req, res, 200, { ok: true });
   }
+
+  if (head === 'mail') return mailApi(req, res, parts.slice(1), method);
 
   if (head === 'feed' && method === 'GET') {
     const text = await fetchFeed(query.get('url'));
@@ -355,11 +359,35 @@ async function api(req, res, pathname, query) {
   return json(req, res, 404, { error: 'Not found' });
 }
 
+// Mail accounts (IMAP/SMTP). Responses carry the items they changed so the
+// browser can show them without waiting for its next refresh.
+async function mailApi(req, res, [what, id], method) {
+  if (what === 'presets' && method === 'GET') return json(req, res, 200, mail.presets());
+  if (what === 'accounts') {
+    if (method === 'POST' && !id) return json(req, res, 200, { account: await mail.saveAccount(await readJson(req) || {}) });
+    if (method === 'PUT' && id) return json(req, res, 200, { account: await mail.saveAccount(await readJson(req) || {}, id) });
+    if (method === 'DELETE' && id) { mail.deleteAccount(id); return json(req, res, 200, { ok: true }); }
+  }
+  if (what === 'sync' && method === 'POST' && id) {
+    const r = await mail.sync(id);
+    const mine = Object.values(getCollection('mail')).filter((m) => m.account === id);
+    return json(req, res, 200, { ...r, account: getCollection('mail_accounts')[id], items: mine });
+  }
+  if (what === 'message' && method === 'GET' && id) return json(req, res, 200, await mail.body(id));
+  if (what === 'action' && method === 'POST' && id) {
+    const body = (await readJson(req)) || {};
+    return json(req, res, 200, await mail.action(id, body.op, body));
+  }
+  if (what === 'send' && method === 'POST') return json(req, res, 200, await mail.send((await readJson(req)) || {}));
+  return json(req, res, 404, { error: 'Not found' });
+}
+
 // ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
 
 loadStore();
+const mail = createMail({ DATA_DIR, getCollection, markDirty });
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');

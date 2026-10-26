@@ -38,8 +38,8 @@
   --glass-pop: rgba(34, 34, 40, 0.8);
   --shadow-pop: inset 0 0 0 0.5px rgba(255, 255, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 22px 60px rgba(0, 0, 0, 0.45), 0 4px 16px rgba(0, 0, 0, 0.25);
 
-  --dock-h: 68px;
-  --dock-gap: 14px;
+  --dock-h: 48px;
+  --dock-gap: 0px;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -91,7 +91,7 @@ mark { background: rgba(var(--accent-rgb), 0.32); color: inherit; border-radius:
 ::selection { background: rgba(var(--accent-rgb), 0.38); }
 
 :focus-visible { outline: 2px solid rgba(var(--accent-rgb), 0.85); outline-offset: 2px; }
-input:focus-visible, textarea:focus-visible, [contenteditable]:focus-visible, .sheet:focus-visible, .menu:focus-visible { outline: none; }
+input:focus-visible, textarea:focus-visible, [contenteditable]:focus-visible, .appwin:focus-visible, .menu:focus-visible { outline: none; }
 
 /* Thin overlay-style scrollbars */
 * { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.16) transparent; }
@@ -145,13 +145,12 @@ input:focus-visible, textarea:focus-visible, [contenteditable]:focus-visible, .s
   animation-delay: 0ms !important;
   transition-duration: 0.01ms !important;
 }
-.reduce-motion .sheet, .reduce-motion .sheet-scrim { transition: opacity 0.22s ease !important; }
 
 @media (prefers-reduced-transparency: reduce) {
   :root { --glass-pop: rgb(34, 34, 40); }
-  .widget, .dock-bg, .sheet, .popover, .toast, .spotlight, .search-pill { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
-  .sheet { background: rgb(24, 24, 28) !important; }
-  .widget, .dock-bg, .search-pill { background: rgba(28, 28, 34, 0.94) !important; }
+  .widget, .taskbar, .appwin, .popover, .toast, .spotlight { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  .appwin { background: rgb(24, 24, 28) !important; }
+  .widget, .taskbar { background: rgba(28, 28, 34, 0.96) !important; }
 }
 
 @media (prefers-contrast: more) {

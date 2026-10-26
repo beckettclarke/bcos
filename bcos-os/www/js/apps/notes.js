@@ -10,6 +10,7 @@ import { startDrag } from '../lib/dnd.js';
 import { Icon } from '../ui/icons.js';
 import { IconButton, openMenu, openContextMenu, confirm, prompt, toast, useNarrow, EmptyState, useTick, Segmented } from '../ui/components.js';
 import { RichEditor, digest, toMarkdown, fromMarkdown, refreshNoteLinks } from './editor.js';
+import { os } from '../shell/os.js';
 
 const FOLDER_COLORS = ['#f2783c', '#8b5cf6', '#3b82f6', '#22c55e', '#ec4899', '#eab308', '#14b8a6', '#94a3b8'];
 
@@ -166,6 +167,7 @@ export default function NotesApp({ intent, nonce }) {
   // --- keyboard ---
   useEffect(() => {
     const onKey = (e) => {
+      if (os.app !== 'notes') return; // running in the background
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === 'n' && !e.shiftKey) { e.preventDefault(); newNote(); return; }
       if (mod && e.key.toLowerCase() === 'f' && !e.shiftKey) { e.preventDefault(); searchRef.current?.focus(); return; }

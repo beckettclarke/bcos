@@ -315,7 +315,7 @@ button.chip:hover { background: var(--fill-3); color: var(--text); }
   align-items: center;
   gap: 10px;
   min-height: 66px;
-  padding: 16px 66px 12px 26px;
+  padding: 16px 22px 12px 26px;
   flex-shrink: 0;
 }
 .app-title { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -377,8 +377,8 @@ button.chip:hover { background: var(--fill-3); color: var(--text); }
 @media (max-width: 760px) {
   .app { grid-template-columns: 1fr; }
   .app-side { display: none; }
-  .app.show-side .app-side { display: flex; position: absolute; inset: 0; z-index: 5; background: rgb(22, 22, 26); padding-top: 64px; animation: slide-up 0.3s var(--ease-out); }
-  .app-bar { padding: 14px 60px 10px 16px; min-height: 60px; }
+  .app.show-side .app-side { display: flex; position: absolute; inset: 0; z-index: 5; background: rgb(22, 22, 26); padding-top: 16px; animation: slide-up 0.3s var(--ease-out); }
+  .app-bar { padding: 14px 16px 10px; min-height: 60px; }
   .app-title { font-size: 22px; }
   .back-btn { display: inline-grid; }
 }

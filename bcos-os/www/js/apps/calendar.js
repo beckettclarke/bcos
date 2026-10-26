@@ -11,6 +11,7 @@ import { setDone } from '../lib/tasks.js';
 import { Icon } from '../ui/icons.js';
 import { Popover, Segmented, Toggle, IconButton, openMenu, openContextMenu, confirm, prompt, toast, useNarrow, useTick, ColorDots, AutoTextarea, justClosedLayer } from '../ui/components.js';
 import { openApp } from '../shell/os.js';
+import { os } from '../shell/os.js';
 
 const HOUR_H = 52;
 const SNAP = 15;
@@ -194,6 +195,7 @@ export default function CalendarApp({ intent, nonce }) {
   // --- keyboard ---
   useEffect(() => {
     const onKey = (e) => {
+      if (os.app !== 'calendar') return; // running in the background
       if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey || editor || document.querySelector('.popover, .spotlight')) return;
       const k = e.key.toLowerCase();
       if (k === 't') goToday();
