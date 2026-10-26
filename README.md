@@ -54,8 +54,11 @@ bcos-os/
       apps/                 # calendar, tasks, notes (+ editor), journal, mail, settings
 ```
 
-There's no build step: the container is the stock `node:22.11.0-alpine` image with this
-folder mounted read-only, and `www/` is served as-is (ES modules + an import map).
+There's no build step: the container is the stock `node:22.11.0-alpine` image and `www/`
+is served as-is (ES modules + an import map). Umbrel only copies `umbrel-app.yml` and
+`docker-compose.yml` into the installed app folder on updates, so the container runs
+`server.js` straight from Umbrel's read-only checkout of this app store
+(`~/umbrel/app-stores/*/`), which is refreshed on every update.
 
 ### Data
 

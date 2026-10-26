@@ -7,17 +7,34 @@ services:
       APP_PORT: 3000
 
   web:
-    # Stock image, nothing to build: server.js and www/ come from the app
-    # folder, mounted read-only. Your data lives in ./data.
+    # Stock image, nothing to build. Your data lives in ./data.
+    #
+    # Umbrel only copies umbrel-app.yml and this file into the app folder when
+    # the app updates, so a server.js/www/ there would stay at the version
+    # first installed. Instead, run the code straight from Umbrel's checkout
+    # of this app store (refreshed on every update), mounted read-only. The
+    # app folder copy is only a fallback.
     image: node:22.11.0-alpine
     user: "1000:1000"
     init: true
     restart: on-failure
-    working_dir: /app
-    command: ["node", "/app/server.js"]
+    working_dir: /data
+    command:
+      - sh
+      - -c
+      - |
+        for d in /stores/*/; do
+          if [ -f "$${d}bcos-os/server.js" ] && grep -qs '^id: bcos$$' "$${d}umbrel-app-store.yml"; then
+            echo "[bcos] running from app store $${d}"
+            exec node "$${d}bcos-os/server.js"
+          fi
+        done
+        echo "[bcos] app store checkout not found, running the installed copy"
+        exec node /app/server.js
     environment:
       PORT: "3000"
       DATA_DIR: /data
     volumes:
       - ${APP_DATA_DIR}:/app:ro
       - ${APP_DATA_DIR}/data:/data
+      - ${APP_DATA_DIR}/../../app-stores:/stores:ro

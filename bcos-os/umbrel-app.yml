@@ -2,7 +2,7 @@ manifestVersion: 1
 id: bcos-os
 category: utilities
 name: BCOS
-version: "0.3.0"
+version: "0.3.1"
 tagline: Your personal OS, running on Umbrel
 description: >-
   BCOS is a personal operating environment that runs as an Umbrel app: a
