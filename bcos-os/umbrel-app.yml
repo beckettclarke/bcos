@@ -1,0 +1,23 @@
+manifestVersion: 1
+id: bcos-os
+category: utilities
+name: BCOS
+version: "0.1.0"
+tagline: Your personal OS, running on Umbrel
+description: >-
+  BCOS is a personal operating environment that runs as an Umbrel app.
+  This early build shows a ready screen while the rest is built out.
+releaseNotes: >-
+  Initial release with an "OS ready" screen.
+developer: Beckett Clarke
+website: ""
+dependencies: []
+repo: ""
+support: ""
+port: 8742
+gallery: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+submitter: Beckett Clarke
+submission: ""
