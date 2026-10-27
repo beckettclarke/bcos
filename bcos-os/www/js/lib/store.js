@@ -15,7 +15,7 @@ const OUTBOX_KEY = 'bcos.outbox.v1';
 
 export const DEFAULT_SETTINGS = {
   id: 'prefs',
-  name: 'Beckett',
+  name: '',
   wallpaper: 'peaks',
   customWallpaper: null,
   accent: 'sunset',
@@ -26,7 +26,12 @@ export const DEFAULT_SETTINGS = {
   calendar: { view: 'week', dayStart: 7, defaultDuration: 60, showTasks: true },
   tasks: { completed: 'section' },
   notes: { sort: 'edited', view: 'list', font: 'sans' },
+  journal: { font: 'sans', showFood: true },
+  // AI: presets pair a provider with a model; `tasks` maps each AI feature to
+  // a preset id, 'default' or 'ask'. Keys live on the server, never here.
+  ai: { presets: [], defaultPreset: 'ask', tasks: {} },
 };
+const NESTED = ['calendar', 'tasks', 'notes', 'journal', 'ai'];
 
 const data = new Map();      // collection → Map(id → item)
 const arrays = new Map();    // collection → cached array for the current version
@@ -160,9 +165,7 @@ export function settings() {
   return {
     ...DEFAULT_SETTINGS,
     ...s,
-    calendar: { ...DEFAULT_SETTINGS.calendar, ...(s.calendar || {}) },
-    tasks: { ...DEFAULT_SETTINGS.tasks, ...(s.tasks || {}) },
-    notes: { ...DEFAULT_SETTINGS.notes, ...(s.notes || {}) },
+    ...Object.fromEntries(NESTED.map((k) => [k, { ...DEFAULT_SETTINGS[k], ...(s[k] || {}) }])),
   };
 }
 
@@ -174,7 +177,7 @@ export function useSettings() {
 export function setSettings(changes) {
   const cur = settings();
   const next = { ...cur, ...changes };
-  for (const k of ['calendar', 'tasks', 'notes']) if (changes[k]) next[k] = { ...cur[k], ...changes[k] };
+  for (const k of NESTED) if (changes[k]) next[k] = { ...cur[k], ...changes[k] };
   put('settings', next);
 }
 

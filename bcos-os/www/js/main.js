@@ -1,8 +1,8 @@
 // Boot: paint from the local cache, connect to the Umbrel, then render.
 
 import { html, render } from './lib/html.js';
-import { boot } from './lib/store.js';
-import { seed } from './lib/seed.js';
+import { boot, status } from './lib/store.js';
+import { seed, removePlaceholders } from './lib/seed.js';
 import { refreshStaleFeeds } from './lib/feeds.js';
 import { App } from './shell/App.js';
 import { preloadApps } from './shell/Windows.js';
@@ -11,6 +11,8 @@ import { appById } from './shell/apps.js';
 
 async function start() {
   await boot({ seed });
+  // Only with the server's data in hand, so nothing is judged from a stale cache.
+  if (status.mode !== 'server' || status.online) removePlaceholders();
   render(html`<${App} />`, document.getElementById('root'));
   document.documentElement.classList.add('is-booted');
   document.getElementById('boot')?.addEventListener('transitionend', (e) => e.target.remove(), { once: true });

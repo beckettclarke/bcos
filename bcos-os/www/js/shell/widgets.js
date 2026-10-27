@@ -97,7 +97,7 @@ function JournalWidget() {
   return html`<button class="widget w-pills" onClick=${open('journal', { type: 'day', date: todayKey() })}>
     <div class="w-pill"><${Icon} name="flame" size=${17} /><span class="w-pill-label">Streak</span><span class="w-pill-value">${plural(st.streak, 'day')}</span></div>
     <div class="w-pill"><${Icon} name="book" size=${17} /><span class="w-pill-label">This month</span><span class="w-pill-value">${st.monthCount}</span></div>
-    <div class="w-pill"><span class="w-pill-emoji">${mood ? mood.face : '·'}</span><span class="w-pill-label">Mood</span><span class="w-pill-value">${mood ? mood.label : '—'}</span></div>
+    <div class="w-pill"><span class="w-pill-emoji">${mood ? mood.face : '·'}</span><span class="w-pill-label">Mood</span><span class="w-pill-value">${mood ? mood.short : '—'}</span></div>
   </button>`;
 }
 

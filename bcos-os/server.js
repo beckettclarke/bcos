@@ -19,6 +19,7 @@ const os = require('node:os');
 const zlib = require('node:zlib');
 const crypto = require('node:crypto');
 const { createMail } = require('./mail.js');
+const { createAI } = require('./ai.js');
 
 const PORT = Number(process.env.PORT || 3000);
 const APP_DIR = __dirname;
@@ -319,11 +320,13 @@ async function api(req, res, pathname, query) {
     await fsp.rm(FILES_DIR, { recursive: true, force: true });
     fs.mkdirSync(FILES_DIR, { recursive: true });
     await mail.reset();
+    ai.reset();
     fresh = true;
     return json(req, res, 200, { ok: true });
   }
 
   if (head === 'mail') return mailApi(req, res, parts.slice(1), method);
+  if (head === 'ai') return aiApi(req, res, parts.slice(1), method);
 
   if (head === 'feed' && method === 'GET') {
     const text = await fetchFeed(query.get('url'));
@@ -382,12 +385,25 @@ async function mailApi(req, res, [what, id], method) {
   return json(req, res, 404, { error: 'Not found' });
 }
 
+// AI providers. Keys go in, never out: listing shows only whether one is set.
+async function aiApi(req, res, [what, id], method) {
+  if (what === 'providers' && !id && method === 'GET') return json(req, res, 200, { providers: ai.list() });
+  if (what === 'providers' && id) {
+    if (method === 'PUT') return json(req, res, 200, { provider: ai.update(id, (await readJson(req)) || {}) });
+    if (method === 'DELETE') { ai.remove(id); return json(req, res, 200, { ok: true }); }
+  }
+  if (what === 'models' && id && method === 'GET') return json(req, res, 200, { models: await ai.models(id) });
+  if (what === 'chat' && method === 'POST') return json(req, res, 200, await ai.chat(await readJson(req)));
+  return json(req, res, 404, { error: 'Not found' });
+}
+
 // ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
 
 loadStore();
 const mail = createMail({ DATA_DIR, getCollection, markDirty });
+const ai = createAI({ DATA_DIR });
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');

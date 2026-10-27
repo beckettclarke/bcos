@@ -9,12 +9,15 @@ import { Segmented, Toggle, Avatar, confirm, toast, useNarrow } from '../ui/comp
 import { WALLPAPERS, ACCENTS, wallpaperStyle } from '../shell/theme.js';
 import { WIDGETS } from '../shell/widgets.js';
 import { APPS } from '../shell/apps.js';
+import AISettings from './settings-ai.js';
+import { presets } from '../lib/ai.js';
 
 const TABS = [
   { id: 'all', label: 'All' },
   { id: 'account', label: 'Account' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'apps', label: 'Apps' },
+  { id: 'ai', label: 'AI' },
   { id: 'data', label: 'Data' },
 ];
 
@@ -124,6 +127,11 @@ export default function SettingsApp({ intent, nonce }) {
       </select>`,
     },
     {
+      id: 'ai', tab: 'apps', icon: 'sparkle', title: 'AI providers & presets',
+      desc: presets().length ? `${presets().length} preset${presets().length === 1 ? '' : 's'} — used by Journal import, smart cards and food` : 'Connect OpenAI, Anthropic, Google, DeepSeek, Qwen, Kimi, GLM, OpenRouter and more',
+      control: html`<button class="btn btn-sm" onClick=${() => setTab('ai')}>Manage</button>`,
+    },
+    {
       id: 'sync', tab: 'data', icon: st.mode === 'local' ? 'database' : st.online ? 'cloud-check' : 'cloud-off', title: 'Sync',
       desc: st.mode === 'local' ? 'Saved in this browser only — run BCOS on your Umbrel to sync' : st.online ? `Everything is saved on your Umbrel${st.lastSync ? ' and up to date' : ''}` : 'Offline — changes are queued and will sync automatically',
       control: html`<span class=${cx('sync-pill', st.mode === 'local' ? 'is-muted' : st.online ? 'is-ok' : 'is-warn')}>${st.mode === 'local' ? 'Local' : st.online ? 'Synced' : 'Offline'}</span>`,
@@ -144,7 +152,7 @@ export default function SettingsApp({ intent, nonce }) {
       }}>Restore…</button>`,
     },
     {
-      id: 'reset', tab: 'data', icon: 'trash', title: 'Erase everything', desc: 'Delete all data and start again with the sample content', danger: true,
+      id: 'reset', tab: 'data', icon: 'trash', title: 'Erase everything', desc: 'Delete all data and start again from empty', danger: true,
       control: html`<button class="btn btn-sm btn-danger" onClick=${async () => {
         if (!(await confirm({ title: 'Erase all BCOS data?', body: 'Every event, task, note, journal entry and message will be deleted. Export a backup first if you might want it.', confirmLabel: 'Erase', danger: true }))) return;
         try { await resetAll(); toast('BCOS was reset', { icon: 'refresh' }); } catch (err) { toast(err.message, { icon: 'alert' }); }
@@ -198,14 +206,14 @@ export default function SettingsApp({ intent, nonce }) {
           <${Segmented} value=${tab} onChange=${setTab} options=${TABS.map((t) => ({ value: t.id, label: t.label }))} />
           ${!narrow && html`<div class="search-field settings-search"><${Icon} name="search" size=${14} /><input class="field" placeholder="Search" value=${q} onInput=${(e) => setQ(e.target.value)} /></div>`}
         </div>
-        ${groups.map((g, i) => html`<div class="settings-group" key=${i}>
+        ${tab === 'ai' && !query ? html`<${AISettings} />` : groups.map((g, i) => html`<div class="settings-group" key=${i}>
           ${g.map((r) => html`<div key=${r.id} class=${cx('settings-row', r.wide && 'is-wide', r.danger && 'is-danger')}>
             <span class="settings-icon"><${Icon} name=${r.icon} size=${16} stroke=${2} /></span>
             <div class="settings-text"><div class="settings-row-title">${r.title}</div><div class="settings-row-desc">${r.desc}</div></div>
             <div class="settings-control">${r.control}</div>
           </div>`)}
         </div>`)}
-        ${!shown.length && html`<div class="notes-empty">No settings match “${q}”.</div>`}
+        ${!shown.length && !(tab === 'ai' && !query) && html`<div class="notes-empty">No settings match “${q}”.</div>`}
       </section>
     </div>
   </div>`;

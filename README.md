@@ -48,7 +48,7 @@ bcos-os/
     css/                    # base, ui, shell, one file per app
     js/
       main.js               # boot
-      lib/                  # store (sync + offline outbox), dates, springs, drag & drop, events, tasks, feeds, seed data
+      lib/                  # store (sync + offline outbox), dates, springs, drag & drop, events, tasks, feeds, first-run setup
       ui/                   # icons, shared components (popovers, menus, dialogs, toasts, controls)
       shell/                # home screen, widgets, taskbar, app windows, search, theme
       apps/                 # calendar, tasks, notes (+ editor), journal, mail, settings

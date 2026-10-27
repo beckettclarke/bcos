@@ -8,7 +8,7 @@
 // local mailbox, which works exactly as before.
 
 import { html, useState, useEffect, useMemo, useRef } from '../lib/html.js';
-import { useCollection, useSettings, put, patch, remove, get, absorb, api, all } from '../lib/store.js';
+import { useCollection, useSettings, settings, put, patch, remove, get, absorb, api, all } from '../lib/store.js';
 import { listStamp, fmt, fmtTime } from '../lib/date.js';
 import { cx, uid, plural, isTyping, splitMatch, modKey, formatBytes, hashHue } from '../lib/util.js';
 import { Icon } from '../ui/icons.js';
@@ -25,7 +25,8 @@ const BOXES = [
   { id: 'trash', name: 'Trash', icon: 'trash' },
 ];
 
-const LOCAL_ME = { name: 'Beckett Clarke', email: 'beckett@bcos.local' };
+// Messages written without an account (kept only in BCOS) come from you.
+const localMe = () => ({ name: settings().name || 'Me', email: 'me@bcos.local' });
 const SYNC_EVERY = 3 * 60 * 1000;
 
 const inBox = (m, box) => box === 'starred' ? m.starred && m.mailbox !== 'trash' && m.mailbox !== 'junk' : m.mailbox === box;
@@ -127,7 +128,7 @@ export default function MailApp({ intent, nonce }) {
   const [adding, setAdding] = useState(null);
 
   const hasLocal = useMemo(() => mail.some((m) => !m.account), [mail]);
-  const myAddresses = useMemo(() => new Set([LOCAL_ME.email, ...accounts.map((a) => a.email)]), [accounts]);
+  const myAddresses = useMemo(() => new Set([localMe().email, ...accounts.map((a) => a.email)]), [accounts]);
   const scoped = useMemo(() => mail.filter((m) => inAccount(m, acct)), [mail, acct]);
   const boxes = BOXES.filter((b) => b.id !== 'junk' || accounts.some((a) => a.folders?.junk));
 
@@ -436,7 +437,7 @@ function Compose({ draftId, account: acct0 = null, to: to0 = '', subject: subj0 
   useEscape(() => close(), !min && !sending);
 
   const from = accounts.find((a) => a.id === account);
-  const fromAddr = from ? { name: from.name, email: from.email } : LOCAL_ME;
+  const fromAddr = from ? { name: from.name, email: from.email } : localMe();
   const dirty = to.trim() || subject.trim() || body.trim();
   const close = () => {
     if (dirty && (to !== to0 || subject !== subj0 || body !== body0 || !draftId)) {

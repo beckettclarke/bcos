@@ -2,7 +2,7 @@ manifestVersion: 1
 id: bcos-os
 category: utilities
 name: BCOS
-version: "0.3.1"
+version: "0.4.0"
 tagline: Your personal OS, running on Umbrel
 description: >-
   BCOS is a personal operating environment that runs as an Umbrel app: a
@@ -10,10 +10,13 @@ description: >-
   calendar, tasks, notes, journal and mail. Everything you write is stored on
   your Umbrel and syncs to every device you open it on.
 releaseNotes: >-
-  Apps now open fullscreen with a Windows-style taskbar: Start, search,
-  running apps you can switch between, minimise and close, and a clock. Mail
-  connects to real accounts — iCloud, Gmail, Yahoo, Fastmail or any IMAP/SMTP
-  server — to read, organise and send your email from BCOS.
+  A rebuilt Journal: an endless month sidebar with photos, icons and mood
+  dots plus filters; day icons, titles, ratings and a 7-point mood; smart
+  cards for flights, races, workouts, places and rides; a food log with
+  icons; and import from Diarly (AI reads your files one at a time) or JSON.
+  New in Settings → AI: connect OpenAI, Anthropic, Google, xAI, DeepSeek,
+  Qwen, Kimi, GLM, Mistral, OpenRouter, NVIDIA NIM, Groq, Ollama or any
+  OpenAI-compatible API, and make presets for each AI feature.
 developer: Beckett Clarke
 website: ""
 dependencies: []

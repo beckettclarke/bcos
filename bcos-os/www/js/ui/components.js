@@ -133,7 +133,7 @@ let menuState = null;
 const menuListeners = new Set();
 const setMenu = (s) => { menuState = s; menuListeners.forEach((fn) => fn()); };
 
-/** items: [{ label, icon, onSelect, danger, checked, shortcut, disabled } | { divider: true } | { heading }] */
+/** items: [{ label, icon | glyph (a vnode), onSelect, danger, checked, shortcut, disabled } | { divider: true } | { heading }] */
 export function openMenu(anchor, items, { placement = 'bottom-start', width, onDismiss } = {}) {
   setMenu({ anchor: anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : anchor, items, placement, width, onDismiss, key: Math.random() });
 }
@@ -182,7 +182,7 @@ function Menu({ anchor, items, placement, width, onClose, onDismiss }) {
         : html`<button type="button" role="menuitem" disabled=${it.disabled}
             class=${cx('menu-item', it.danger && 'is-danger', i === active && 'is-active')}
             onPointerEnter=${() => setActive(i)} onClick=${() => choose(it)}>
-            <span class="menu-icon">${it.checked ? html`<${Icon} name="check" size=${15} />` : it.icon ? html`<${Icon} name=${it.icon} size=${15} />` : it.swatch ? html`<span class="swatch" style=${{ background: it.swatch }} />` : null}</span>
+            <span class="menu-icon">${it.checked ? html`<${Icon} name="check" size=${15} />` : it.glyph ? it.glyph : it.icon ? html`<${Icon} name=${it.icon} size=${15} />` : it.swatch ? html`<span class="swatch" style=${{ background: it.swatch }} />` : null}</span>
             <span class="menu-label">${it.label}</span>
             ${it.shortcut && html`<span class="menu-shortcut">${it.shortcut}</span>`}
           </button>`)}
