@@ -45,6 +45,10 @@ export const AI_TASKS = [
 // --- provider status (from the server) ---------------------------------------
 
 const state = { providers: null, loading: false, error: null, models: {} };
+
+// A 404 from /api/ai means the server process predates AI support.
+const STALE = 'Your BCOS server is out of date — restart it (or update BCOS on your Umbrel) to use AI';
+const explain = (err) => (err?.status === 404 ? Object.assign(new Error(STALE), { status: 404 }) : err);
 const listeners = new Set();
 const emit = () => listeners.forEach((fn) => fn());
 
@@ -52,7 +56,7 @@ export async function refreshProviders() {
   if (status.mode !== 'server') { state.error = 'AI needs the BCOS server'; state.providers = []; emit(); return; }
   state.loading = true; emit();
   try { state.providers = (await api('ai/providers')).providers; state.error = null; }
-  catch (err) { state.error = err.message; }
+  catch (err) { state.error = explain(err).message; }
   state.loading = false; emit();
 }
 
@@ -76,7 +80,7 @@ export async function saveProvider(id, changes) {
 }
 
 export async function fetchModels(id) {
-  const { models } = await api(`ai/models/${id}`, { timeout: 25000 });
+  const { models } = await api(`ai/models/${id}`, { timeout: 25000 }).catch((err) => { throw explain(err); });
   state.models[id] = models;
   emit();
   return models;
@@ -127,7 +131,7 @@ export async function chatStream(preset, { system, prompt, messages, json = fals
   if (!res.ok || !res.body) {
     let msg = `Something went wrong (${res.status})`;
     try { msg = (await res.json()).error || msg; } catch {}
-    throw Object.assign(new Error(msg), { status: res.status });
+    throw explain(Object.assign(new Error(msg), { status: res.status }));
   }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -164,6 +168,6 @@ export async function chat(preset, { system, prompt, messages, json = false, max
       json,
       maxTokens,
     },
-  });
+  }).catch((err) => { throw explain(err); });
   return json ? parseJSON(r.text) : r.text;
 }
