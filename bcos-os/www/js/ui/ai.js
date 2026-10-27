@@ -2,7 +2,7 @@
 // runTask(), which picks the preset for a feature and runs it.
 
 import { html } from '../lib/html.js';
-import { providerInfo, presetFor, presets, chat } from '../lib/ai.js';
+import { providerInfo, presetFor, presets, chat, chatStream } from '../lib/ai.js';
 import { openMenu, toast } from './components.js';
 import { openApp } from '../shell/os.js';
 import { Icon } from './icons.js';
@@ -45,10 +45,10 @@ export function choosePreset(taskId, anchor, { forceAsk = false } = {}) {
 
 /**
  * Pick a preset for `taskId` (anchored to the button that started it) and run
- * one chat. Resolves the answer, or null if the user dismissed the picker.
+ * one chat (streamed when opts.onText is given). Resolves the answer, or null if the user dismissed the picker.
  */
 export async function runTask(taskId, anchor, opts) {
   const preset = await choosePreset(taskId, anchor, opts);
   if (!preset) return null;
-  return { preset, result: await chat(preset, opts) };
+  return { preset, result: opts.onText ? await chatStream(preset, opts, opts.onText) : await chat(preset, opts) };
 }

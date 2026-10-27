@@ -1,7 +1,8 @@
 // Journal facts used by the Journal app, its import, and the home-screen widget.
 //
 // An entry (collection `journal`, id = 'YYYY-MM-DD'):
-//   { id, date, v: 2, icon, title, rating (0.5–5), mood (1–7), html, text,
+//   { id, date, v: 2, icon, rating (0.5–5), mood (1–7), html (cards inline as
+//     <figure data-card="id">), text,
 //     meals: { breakfast|lunch|dinner|snacks: [Food] }, cards: [Card],
 //     people: [name], tags: [tag], photos: [{ id, url }] }
 // Version-1 entries used a 1–5 mood and `activities`; moodOf/tagsOf read both.
@@ -27,15 +28,15 @@ export const moodInfo = (v) => MOODS.find((m) => m.v === v) || null;
 export const tagsOf = (e) => [...new Set([...(e?.tags || []), ...(e?.activities || []).map((a) => LEGACY_ACTIVITY[a] || a)])];
 
 export const MEALS = [
-  { id: 'breakfast', label: 'Breakfast', emoji: '🥞' },
-  { id: 'lunch', label: 'Lunch', emoji: '🥗' },
-  { id: 'dinner', label: 'Dinner', emoji: '🍝' },
-  { id: 'snacks', label: 'Snacks', emoji: '🍿' },
+  { id: 'breakfast', label: 'Breakfast', icon: 'sunrise' },
+  { id: 'lunch', label: 'Lunch', icon: 'sun' },
+  { id: 'dinner', label: 'Dinner', icon: 'moon' },
+  { id: 'snacks', label: 'Snacks', icon: 'cookie' },
 ];
 
 export const foodCount = (e) => MEALS.reduce((n, m) => n + (e?.meals?.[m.id]?.length || 0), 0);
 
-export const hasContent = (e) => !!(e && ((e.text && e.text.trim()) || e.mood || e.rating || e.title || e.icon
+export const hasContent = (e) => !!(e && ((e.text && e.text.trim()) || e.mood || e.rating || e.icon
   || e.cards?.length || e.photos?.length || foodCount(e) || e.people?.length || e.tags?.length || e.activities?.length));
 
 /** Mood, ratings, streaks and words across all entries. */

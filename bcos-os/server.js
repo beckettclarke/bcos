@@ -394,6 +394,19 @@ async function aiApi(req, res, [what, id], method) {
   }
   if (what === 'models' && id && method === 'GET') return json(req, res, 200, { models: await ai.models(id) });
   if (what === 'chat' && method === 'POST') return json(req, res, 200, await ai.chat(await readJson(req)));
+  // Streams NDJSON: { d: "text" }… then { done: true, ms } or { error, status }.
+  if (what === 'stream' && method === 'POST') {
+    const body = await readJson(req);
+    const ctrl = new AbortController();
+    res.on('close', () => { if (!res.writableEnded) ctrl.abort(); });
+    res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
+    const line = (o) => res.write(`${JSON.stringify(o)}\n`);
+    try {
+      const r = await ai.stream(body, (d) => line({ d }), ctrl.signal);
+      line({ done: true, ms: r.ms });
+    } catch (err) { line({ error: err.message, status: err.status || 500 }); }
+    return res.end();
+  }
   return json(req, res, 404, { error: 'Not found' });
 }
 

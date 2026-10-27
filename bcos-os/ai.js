@@ -29,6 +29,15 @@ const PROVIDERS = {
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
 
+/** A provider's error answer → an Error with a status the browser can act on (401 key, 429 rate limit). */
+function providerError(status, text) {
+  let data = null;
+  try { data = JSON.parse(text); } catch {}
+  const msg = data?.error?.message || data?.error?.msg || (typeof data?.error === 'string' ? data.error : '') || data?.message || String(text || '').slice(0, 200);
+  const code = status === 401 || status === 403 ? 401 : status === 429 || status === 529 || /rate.?limit|quota|overloaded/i.test(msg) ? 429 : 502;
+  return fail(code, `Provider answered ${status}${msg ? `: ${msg}` : ''}`);
+}
+
 function createAI({ DATA_DIR }) {
   const FILE = path.join(DATA_DIR, 'ai-providers.json');
   let secrets = {};
@@ -71,13 +80,8 @@ function createAI({ DATA_DIR }) {
     try {
       const r = await fetch(url, { ...init, signal: ctrl.signal });
       const text = await r.text();
-      let data = null;
-      try { data = JSON.parse(text); } catch {}
-      if (!r.ok) {
-        const msg = data?.error?.message || data?.error?.msg || (typeof data?.error === 'string' ? data.error : '') || data?.message || text.slice(0, 200);
-        throw fail(r.status === 401 || r.status === 403 ? 401 : 502, `Provider answered ${r.status}${msg ? `: ${msg}` : ''}`);
-      }
-      return data ?? text;
+      if (!r.ok) throw providerError(r.status, text);
+      try { return JSON.parse(text); } catch { return text; }
     } catch (err) {
       if (err.name === 'AbortError') throw fail(504, 'The model took too long to answer');
       if (err.status) throw err;
@@ -159,14 +163,91 @@ function createAI({ DATA_DIR }) {
     let d;
     // Not every compatible API accepts response_format; the prompt asks for
     // JSON anyway, so retry without it rather than fail.
-    if (json) { try { d = await send({ response_format: { type: 'json_object' } }); } catch (err) { if (err.status !== 502 || !/400|422/.test(err.message)) throw err; d = await send({}); } }
+    if (json) { try { d = await send({ response_format: { type: 'json_object' } }); } catch (err) { if (err.status !== 502 || !/ 400| 422/.test(err.message)) throw err; d = await send({}); } }
     else d = await send({});
     const msg = d.choices?.[0]?.message || {};
     const text = typeof msg.content === 'string' ? msg.content : (msg.content || []).map((c) => c.text || '').join('');
     return { text, usage: { in: d.usage?.prompt_tokens, out: d.usage?.completion_tokens }, ms: Date.now() - t0 };
   }
 
+  /**
+   * Like chat(), but calls onDelta(text) as the answer streams in. `signal`
+   * aborts the upstream request (the browser went away).
+   */
+  async function stream(body, onDelta, signal) {
+    const { provider, model, system = '', messages = [], json = false, temperature, maxTokens } = body || {};
+    if (!model) throw fail(400, 'Pick a model for this preset');
+    if (!Array.isArray(messages) || !messages.length) throw fail(400, 'Nothing to send');
+    const p = resolve(provider);
+    const t0 = Date.now();
+    let url, init, pick;
+
+    if (p.kind === 'anthropic') {
+      url = `${p.base}/messages`;
+      init = { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': p.key, 'anthropic-version': '2023-06-01' }, body: JSON.stringify({
+        model, max_tokens: maxTokens || 16000, stream: true,
+        ...(system ? { system } : {}), ...(temperature != null ? { temperature } : {}),
+        messages: messages.map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content) })),
+      }) };
+      pick = (d) => (d.type === 'content_block_delta' ? d.delta?.text || '' : d.type === 'error' ? Promise.reject(fail(d.error?.type === 'overloaded_error' ? 429 : 502, d.error?.message || 'Stream error')) : '');
+    } else if (p.kind === 'gemini') {
+      url = `${p.base}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
+      init = { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': p.key }, body: JSON.stringify({
+        ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
+        contents: messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: String(m.content) }] })),
+        generationConfig: { ...(json ? { responseMimeType: 'application/json' } : {}), ...(temperature != null ? { temperature } : {}), ...(maxTokens ? { maxOutputTokens: maxTokens } : {}) },
+      }) };
+      pick = (d) => (d.candidates?.[0]?.content?.parts || []).map((x) => x.text || '').join('');
+    } else {
+      url = `${p.base}/chat/completions`;
+      const payload = {
+        model, stream: true,
+        messages: [...(system ? [{ role: 'system', content: system }] : []), ...messages.map((m) => ({ role: m.role, content: String(m.content) }))],
+        ...(temperature != null ? { temperature } : {}), ...(maxTokens ? { max_tokens: maxTokens } : {}),
+      };
+      init = { method: 'POST', headers: openaiHeaders(p, provider), body: JSON.stringify(json ? { ...payload, response_format: { type: 'json_object' } } : payload) };
+      init.retry = json ? { ...init, body: JSON.stringify(payload) } : null;
+      pick = (d) => d.choices?.[0]?.delta?.content || '';
+    }
+
+    const ctrl = new AbortController();
+    signal?.addEventListener('abort', () => ctrl.abort());
+    const idle = () => { clearTimeout(timer); timer = setTimeout(() => ctrl.abort(), 120000); };
+    let timer;
+    idle();
+    try {
+      let r = await fetch(url, { ...init, signal: ctrl.signal });
+      if (!r.ok && init.retry && (r.status === 400 || r.status === 422)) r = await fetch(url, { ...init.retry, signal: ctrl.signal });
+      if (!r.ok) throw providerError(r.status, await r.text());
+      const decoder = new TextDecoder();
+      let buf = '', text = '';
+      for await (const chunk of r.body) {
+        idle();
+        buf += decoder.decode(chunk, { stream: true });
+        let nl;
+        while ((nl = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line.startsWith('data:')) continue;
+          const data = line.slice(5).trim();
+          if (!data || data === '[DONE]') continue;
+          let d;
+          try { d = JSON.parse(data); } catch { continue; }
+          if (d.error && p.kind !== 'anthropic') throw fail(/rate|quota/i.test(d.error.message || '') ? 429 : 502, d.error.message || 'Stream error');
+          const piece = await pick(d);
+          if (piece) { text += piece; onDelta(piece); }
+        }
+      }
+      return { text, ms: Date.now() - t0 };
+    } catch (err) {
+      if (err.name === 'AbortError') throw fail(504, signal?.aborted ? 'Cancelled' : 'The model stopped answering');
+      if (err.status) throw err;
+      throw fail(502, `Couldn’t reach the provider (${err.cause?.code || err.message})`);
+    } finally { clearTimeout(timer); }
+  }
+
   return {
+    stream,
     list: () => Object.keys(PROVIDERS).map(describe),
     update(id, { key, baseUrl } = {}) {
       if (!PROVIDERS[id]) throw fail(404, 'Unknown provider');

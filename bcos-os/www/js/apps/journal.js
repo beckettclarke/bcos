@@ -3,7 +3,7 @@
 // an icon, title, rating and mood, smart cards (flights, races, places…),
 // the day's story, and a food log with icons.
 
-import { html, useState, useEffect, useLayoutEffect, useMemo, useRef } from '../lib/html.js';
+import { html, render, useState, useEffect, useLayoutEffect, useMemo, useRef } from '../lib/html.js';
 import { useCollection, put, get, remove, useSettings, setSettings, settings, useStatus, uploadImage } from '../lib/store.js';
 import { todayKey, dayKey, fromKey, addDays, addMonths, startOfMonth, fmt, isToday, isoWeek, weekdayNames } from '../lib/date.js';
 import { cx, escapeHtml, plural, isTyping, uid, downscaleImage, download } from '../lib/util.js';
@@ -13,7 +13,7 @@ import { EmojiPicker } from '../ui/emoji.js';
 import { runTask } from '../ui/ai.js';
 import { RichEditor, digest, toMarkdown } from './editor.js';
 import { MOODS, MEALS, moodOf, moodInfo, tagsOf, hasContent, journalStats, foodCount } from './journal-shared.js';
-import { CARD_TYPES, Card, CardEditor, cardSummary, normalizeCard, ENRICH_SYSTEM, enrichPrompt } from './journal-cards.js';
+import { CARD_TYPES, Card, CardPin, CardEditor, cardType, cardSummary, cardIcon, normalizeCard, ENRICH_SYSTEM, enrichPrompt } from './journal-cards.js';
 import { parseFoodText, foodLabel, foodSummary, iconFor, FOOD_SYSTEM, foodPrompt, normalizeMeals } from './journal-food.js';
 import { ImportSheet } from './journal-import-ui.js';
 import { os } from '../shell/os.js';
@@ -129,7 +129,7 @@ function Sidebar({ entries, byDay, day, pick, jump, weekStart, filter, setFilter
 
   const results = useMemo(() => {
     if (!q) return [];
-    return entries.filter((e) => hasContent(e) && [e.title, e.text, ...(e.people || []), ...tagsOf(e), ...(e.cards || []).map((c) => cardSummary(c).text), ...MEALS.flatMap((m) => (e.meals?.[m.id] || []).map((f) => f.name))]
+    return entries.filter((e) => hasContent(e) && [e.text, ...(e.people || []), ...tagsOf(e), ...(e.cards || []).map(cardSummary), ...MEALS.flatMap((m) => (e.meals?.[m.id] || []).map((f) => f.name))]
       .some((t) => t && String(t).toLowerCase().includes(q))).sort((a, b) => b.id.localeCompare(a.id)).slice(0, 200);
   }, [entries, q]);
 
@@ -140,7 +140,7 @@ function Sidebar({ entries, byDay, day, pick, jump, weekStart, filter, setFilter
     const item = (kind, value, label, icon) => ({ label, icon, checked: filter.kind === kind && filter.value === value, onSelect: () => setFilter({ id: `${kind}:${value}`, kind, value, label }) });
     openMenu(el, [
       { heading: 'Cards' },
-      ...CARD_TYPES.filter((t) => !['flight', 'race'].includes(t.id)).map((t) => ({ ...item('card', t.id, t.label), glyph: html`<span class="menu-emoji">${t.emoji}</span>` })),
+      ...CARD_TYPES.filter((t) => !['flight', 'race'].includes(t.id)).map((t) => ({ ...item('card', t.id, t.label), icon: t.icon })),
       { divider: true }, { heading: 'Mood' },
       ...MOODS.slice().reverse().map((m) => ({ ...item('mood', m.v, m.label), swatch: m.color })),
       ...(people.length ? [{ divider: true }, { heading: 'People' }, ...people.map((p) => item('person', p, p, 'user'))] : []),
@@ -177,8 +177,8 @@ function Sidebar({ entries, byDay, day, pick, jump, weekStart, filter, setFilter
 
     ${q ? html`<div class="js-results">
       ${results.map((e) => html`<button key=${e.id} class=${cx('js-result', e.id === day && 'is-active')} onClick=${() => pick(e.id)}>
-        <span class="js-result-icon" style=${e.photos?.[0] ? { backgroundImage: `url(${e.photos[0].url})` } : null}>${e.photos?.[0] ? '' : e.icon || moodInfo(moodOf(e))?.face || '·'}</span>
-        <span class="js-result-text"><b>${fmt(fromKey(e.id), 'full')}${e.title ? ` · ${e.title}` : ''}</b><span>${(e.text || '').slice(0, 110)}</span></span>
+        <span class="js-result-icon" style=${e.photos?.[0] ? { backgroundImage: `url(${e.photos[0].url})` } : null}>${e.photos?.[0] ? '' : e.icon || html`<${Icon} name="book" size=${15} />`}</span>
+        <span class="js-result-text"><b>${fmt(fromKey(e.id), 'full')}</b><span>${(e.text || '').slice(0, 110)}</span></span>
       </button>`)}
       ${!results.length && html`<div class="js-none">No days match “${query}”.</div>`}
     </div>` : html`<${MonthRail} byDay=${byDay} day=${day} pick=${pick} jump=${jump} weekStart=${weekStart} matches=${matches} onYear=${setYear} api=${railApi} />`}
@@ -310,12 +310,12 @@ function Month({ month, byDay, day, today, pick, weekStart, matches }) {
         const has = hasContent(e);
         const mood = moodInfo(moodOf(e));
         const photo = e?.photos?.[0]?.url;
-        const glyph = e?.icon || (e?.cards?.[0] && cardSummary(e.cards[0]).emoji) || '';
+        const glyph = e?.icon || '';
         const dim = matches && !matches.has(k);
         return html`<button key=${k} data-day=${k} disabled=${k > today}
           class=${cx('jd', has && 'has-entry', k === day && 'is-active', k === today && 'is-today', dim && 'is-dim', matches?.has(k) && 'is-match')}
           onClick=${() => pick(k, false)} aria-label=${fmt(fromKey(k), 'full')}>
-          <span class=${cx('jd-tile', photo && 'has-photo')} style=${photo ? { backgroundImage: `url(${photo})` } : mood ? { '--m': mood.color } : null}>
+          <span class=${cx('jd-tile', photo && 'has-photo')} style=${photo ? { backgroundImage: `url(${photo})` } : null}>
             ${!photo && glyph ? html`<span class="jd-glyph">${glyph}</span>` : null}
             ${photo && e.icon ? html`<span class="jd-badge">${e.icon}</span>` : null}
           </span>
@@ -329,49 +329,105 @@ function Month({ month, byDay, day, today, pick, weekStart, matches }) {
 
 // --- the entry -------------------------------------------------------------------
 
+// Card ids in the order they appear in the story.
+const placedIds = (htmlStr = '') => [...htmlStr.matchAll(/data-card="([\w-]+)"/g)].map((m) => m[1]);
+const figureHtml = (id) => `<figure data-card="${id}" contenteditable="false"></figure>`;
+const squash = (t) => String(t || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+/** Put a new card's figure after the line it belongs to (AI gives us that line's words). */
+function placeFigure(root, id, after) {
+  const want = squash(after);
+  if (want.length >= 4) {
+    for (const el of root.querySelectorAll('li, p, h2, h3, blockquote')) {
+      const clone = el.cloneNode(true);
+      clone.querySelectorAll('ul, ol, figure').forEach((x) => x.remove());
+      const own = squash(clone.textContent);
+      if (!own || !(own.includes(want) || own.includes(want.slice(0, 28)))) continue;
+      if (el.nodeName === 'LI') {
+        const sub = [...el.children].find((c) => c.nodeName === 'UL' || c.nodeName === 'OL');
+        sub ? sub.insertAdjacentHTML('beforebegin', figureHtml(id)) : el.insertAdjacentHTML('beforeend', figureHtml(id));
+      } else el.insertAdjacentHTML('afterend', figureHtml(id));
+      return;
+    }
+  }
+  root.insertAdjacentHTML('beforeend', figureHtml(id));
+}
+
 function EntryView({ day, entry, byDay, go, pick, toggleSide, collapsed, openImport, filtered, setFilter }) {
   const d = fromKey(day);
   const st = useStatus();
   const [pop, setPop] = useState(null); // { kind, anchor, ... }
   const [busy, setBusy] = useState(null);
-  const [saved, setSaved] = useState(false);
-  const savedTimer = useRef(0);
-  const scrollRef = useRef(null);
   const [scrolled, setScrolled] = useState(false);
+  const editor = useRef(null);
   const e = entry || {};
   const mood = moodInfo(moodOf(entry));
-  const save = (changes) => {
-    saveEntry(day, changes);
-    setSaved(true); clearTimeout(savedTimer.current); savedTimer.current = setTimeout(() => setSaved(false), 1400);
+  const save = (changes) => saveEntry(day, changes);
+  const cardsNow = () => get('journal', day)?.cards || [];
+
+  // Cards render into their <figure> placeholders inside the editor.
+  const popRef = useRef(setPop);
+  popRef.current = setPop;
+  const embed = (el, id) => {
+    const c = (entry?.cards || []).find((x) => x.id === id);
+    render(c ? html`<${Card} card=${c} onClick=${(ev) => popRef.current({ kind: 'card', id, anchor: ev.currentTarget })} />` : null, el);
+  };
+  const order = placedIds(e.html);
+  const pinned = order.map((id) => e.cards?.find((c) => c.id === id)).filter((c) => c && cardType(c.type)?.pinned);
+  const jumpTo = (id) => {
+    const el = editor.current?.root()?.querySelector(`figure[data-card="${id}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    el.classList.remove('is-flash'); void el.offsetWidth; el.classList.add('is-flash');
   };
 
+  const addCard = (type) => {
+    const c = { id: uid('c'), type };
+    save({ cards: [...cardsNow(), c] });
+    const api = editor.current;
+    if (api?.hasCaret()) api.insertHtml(figureHtml(c.id));
+    else { api?.root()?.insertAdjacentHTML('beforeend', figureHtml(c.id)); api?.changed(); }
+    setTimeout(() => {
+      const el = api?.root()?.querySelector(`figure[data-card="${c.id}"] .jc`);
+      if (el) { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); setPop({ kind: 'card', id: c.id, anchor: el }); }
+    }, 80);
+  };
+  const deleteCard = (id) => {
+    const api = editor.current;
+    api?.root()?.querySelectorAll(`figure[data-card="${id}"]`).forEach((f) => f.remove());
+    api?.changed();
+    save({ cards: cardsNow().filter((x) => x.id !== id) });
+  };
+  const cardBlocks = CARD_TYPES.map((t) => ({ id: `card-${t.id}`, label: t.label, icon: t.icon, hint: 'Card', keys: `card ${t.id} ${t.label.toLowerCase()}`, run: () => addCard(t.id) }));
+
   const enrich = async (anchor) => {
-    const md = toMarkdown(entryHtml(entry));
+    const md = toMarkdown(entryHtml(entry)).replace(/\{\{card [\w-]+\}\}\n*/g, '');
     if (!md.trim()) { toast('Write something first', { icon: 'pen' }); return; }
     setBusy('enrich');
     try {
-      const r = await runTask('journal.enrich', anchor, { system: ENRICH_SYSTEM, prompt: enrichPrompt(`${e.title ? `# ${e.title}\n` : ''}${md}`), json: true });
+      const r = await runTask('journal.enrich', anchor, { system: ENRICH_SYSTEM, prompt: enrichPrompt(md), json: true, onText: () => {} });
       if (!r) return;
       const cur = get('journal', day) || {};
-      const seen = new Set((cur.cards || []).map((c) => `${c.type}:${cardSummary(c).text}`.toLowerCase()));
-      const fresh = (r.result.cards || []).map(normalizeCard).filter((c) => c && !seen.has(`${c.type}:${cardSummary(c).text}`.toLowerCase()));
+      const seen = new Set((cur.cards || []).map((c) => `${c.type}:${cardSummary(c)}`.toLowerCase()));
+      const fresh = (r.result.cards || []).map((raw) => ({ raw, c: normalizeCard(raw) })).filter(({ c }) => c && !seen.has(`${c.type}:${cardSummary(c)}`.toLowerCase()));
       save({
         icon: cur.icon || r.result.icon || null,
-        title: cur.title || r.result.title || '',
         people: [...new Set([...(cur.people || []), ...(r.result.people || [])])],
         tags: [...new Set([...(cur.tags || []), ...(r.result.tags || []).map((t) => String(t).toLowerCase())])],
-        cards: [...(cur.cards || []), ...fresh],
+        cards: [...(cur.cards || []), ...fresh.map(({ c }) => c)],
       });
-      toast(fresh.length ? `Added ${plural(fresh.length, 'card')}` : 'Nothing new to add', { icon: 'sparkle' });
+      const root = editor.current?.root();
+      if (root && fresh.length) { for (const { raw, c } of fresh) placeFigure(root, c.id, raw.after); editor.current.changed(); }
+      toast(fresh.length ? `Added ${plural(fresh.length, 'card')} to the timeline` : 'Nothing new to add', { icon: 'sparkle' });
     } catch (err) { toast(err.message, { icon: 'alert', duration: 7000 }); }
     finally { setBusy(null); }
   };
 
   const smartFood = async (anchor) => {
-    if (!foodCount(entry)) { toast('Log some food first', { icon: 'coffee' }); return; }
+    if (!foodCount(entry)) { toast('Log some food first', { icon: 'utensils' }); return; }
     setBusy('food');
     try {
-      const r = await runTask('journal.food', anchor, { system: FOOD_SYSTEM, prompt: foodPrompt(e.meals), json: true });
+      const r = await runTask('journal.food', anchor, { system: FOOD_SYSTEM, prompt: foodPrompt(e.meals), json: true, onText: () => {} });
       if (!r) return;
       save({ meals: normalizeMeals(r.result) });
       toast('Food tidied up', { icon: 'sparkle' });
@@ -405,7 +461,7 @@ function EntryView({ day, entry, byDay, go, pick, toggleSide, collapsed, openImp
     { label: 'Import…', icon: 'download', onSelect: openImport },
     { label: 'Serif text', icon: 'type', checked: settings().journal.font === 'serif', onSelect: () => setSettings({ journal: { font: settings().journal.font === 'serif' ? 'sans' : 'serif' } }) },
     { divider: true },
-    { label: 'Copy as Markdown', icon: 'copy', disabled: !entry, onSelect: () => { navigator.clipboard?.writeText(`# ${fmt(d, 'fullYear')}${e.title ? ` — ${e.title}` : ''}\n\n${toMarkdown(entryHtml(entry))}`); toast('Copied', { icon: 'copy' }); } },
+    { label: 'Copy as Markdown', icon: 'copy', disabled: !entry, onSelect: () => { navigator.clipboard?.writeText(`# ${fmt(d, 'fullYear')}\n\n${toMarkdown(entryHtml(entry))}`); toast('Copied', { icon: 'copy' }); } },
     { label: 'Export day as JSON', icon: 'file-down', disabled: !entry, onSelect: () => download(`journal-${day}.json`, JSON.stringify({ format: 'bcos.journal/1', entries: [entry] }, null, 2)) },
     { divider: true },
     { label: 'Delete entry…', icon: 'trash', danger: true, disabled: !entry, onSelect: async () => {
@@ -416,28 +472,26 @@ function EntryView({ day, entry, byDay, go, pick, toggleSide, collapsed, openImp
     } },
   ], { placement: 'bottom-end' });
 
-  return html`<div class=${cx('je', scrolled && 'is-scrolled')} style=${mood ? { '--m': mood.color } : null}>
-    <div class="je-glow" />
+  const addMenu = (el) => openMenu(el, [
+    ...CARD_TYPES.map((t) => ({ label: t.label, icon: t.icon, onSelect: () => addCard(t.id) })),
+    ...(st.mode === 'server' ? [{ divider: true }, { label: 'Photos…', icon: 'image', onSelect: addPhotos }] : []),
+  ], { placement: 'bottom-end', width: 210 });
+
+  return html`<div class=${cx('je', scrolled && 'is-scrolled')}>
     <header class="je-bar">
-      <div class="je-group">
-        <button class="je-btn" aria-label=${collapsed ? 'Show sidebar' : 'Hide sidebar'} onClick=${toggleSide}><${Icon} name="sidebar" size=${16} /></button>
-      </div>
-      <div class="je-group">
-        <button class="je-btn" aria-label="Previous day" onClick=${() => go(-1)}><${Icon} name="chevron-left" size=${16} stroke=${2} /></button>
-        <button class="je-btn" aria-label="Next day" onClick=${() => go(1)} disabled=${day >= todayKey() && !filtered}><${Icon} name="chevron-right" size=${16} stroke=${2} /></button>
-      </div>
-      <span class=${cx('je-saved', saved && 'is-on')}>Saved</span>
+      <button class="je-btn" aria-label=${collapsed ? 'Show sidebar' : 'Hide sidebar'} onClick=${toggleSide}><${Icon} name="sidebar" size=${17} /></button>
+      <button class="je-btn" aria-label="Previous day" onClick=${() => go(-1)}><${Icon} name="chevron-left" size=${17} stroke=${2} /></button>
+      <button class="je-btn" aria-label="Next day" onClick=${() => go(1)} disabled=${day >= todayKey() && !filtered}><${Icon} name="chevron-right" size=${17} stroke=${2} /></button>
+      <span class="je-bar-date">${fmt(d, 'monthDayYear')}</span>
       <span class="spacer" />
-      <div class="je-group">
-        <button class="je-btn" aria-label="Smart cards" title="Find cards, people and an icon with AI" disabled=${busy === 'enrich'} onClick=${(ev) => enrich(ev.currentTarget)}>
-          ${busy === 'enrich' ? html`<span class="spinner sm" />` : html`<${Icon} name="sparkle" size=${16} />`}
-        </button>
-        <button class="je-btn" aria-label="Import" title="Import" onClick=${openImport}><${Icon} name="download" size=${16} /></button>
-        <button class="je-btn" aria-label="More" onClick=${(ev) => moreMenu(ev.currentTarget)}><${Icon} name="more" size=${16} /></button>
-      </div>
+      <button class="je-btn" aria-label="Add a card" title="Add a card" onClick=${(ev) => addMenu(ev.currentTarget)}><${Icon} name="plus" size=${17} /></button>
+      <button class="je-btn" aria-label="Smart cards" title="Find cards, people and an icon with AI" disabled=${busy === 'enrich'} onClick=${(ev) => enrich(ev.currentTarget)}>
+        ${busy === 'enrich' ? html`<span class="spinner sm" />` : html`<${Icon} name="sparkle" size=${17} />`}
+      </button>
+      <button class="je-btn" aria-label="More" onClick=${(ev) => moreMenu(ev.currentTarget)}><${Icon} name="more" size=${17} /></button>
     </header>
 
-    <div class="je-scroll" ref=${scrollRef} onScroll=${(ev) => setScrolled(ev.currentTarget.scrollTop > 8)}>
+    <div class="je-scroll" onScroll=${(ev) => setScrolled(ev.currentTarget.scrollTop > 40)}>
       <article class="je-doc">
         <div class="je-hero">
           <button class=${cx('je-icon', !e.icon && 'is-empty')} aria-label="Day icon" onClick=${(ev) => setPop({ kind: 'icon', anchor: ev.currentTarget })}>
@@ -448,26 +502,25 @@ function EntryView({ day, entry, byDay, go, pick, toggleSide, collapsed, openImp
             <h1 class="je-date">${fmt(d, 'monthLong')} ${d.getDate()}<span>, ${d.getFullYear()}</span></h1>
           </div>
         </div>
-        <${TitleField} value=${e.title || ''} onSave=${(title) => save({ title })} />
 
         <div class="je-props">
           <${Stars} value=${e.rating || 0} onChange=${(rating) => save({ rating: rating || null })} />
-          <span class="je-sep" />
           <button class=${cx('je-prop', mood && 'is-set')} onClick=${(ev) => setPop({ kind: 'mood', anchor: ev.currentTarget })}>
             ${mood ? html`<i class="je-mood-dot" style=${{ background: mood.color }} />${mood.label}` : html`<${Icon} name="smile" size=${14} />Mood`}
           </button>
-          <span class="je-sep" />
           ${(e.people || []).map((p) => html`<button key=${p} class="je-prop is-set is-person" onClick=${(ev) => openMenu(ev.currentTarget, [
             { label: `Days with ${p}`, icon: 'calendar', onSelect: () => setFilter({ id: `person:${p}`, kind: 'person', value: p, label: p }) },
             { label: 'Remove', icon: 'x', danger: true, onSelect: () => save({ people: e.people.filter((x) => x !== p) }) },
           ])}><span class="je-avatar">${p[0]}</span>${p}</button>`)}
-          <button class="je-prop is-add" onClick=${(ev) => setPop({ kind: 'people', anchor: ev.currentTarget })}><${Icon} name="user" size=${14} />${e.people?.length ? '' : 'People'}</button>
+          <button class="je-prop is-add" aria-label="Add people" onClick=${(ev) => setPop({ kind: 'people', anchor: ev.currentTarget })}><${Icon} name="user" size=${14} />${e.people?.length ? '' : 'People'}</button>
           ${tagsOf(e).map((t) => html`<button key=${t} class="je-prop is-set is-tag" onClick=${(ev) => openMenu(ev.currentTarget, [
             { label: `Days tagged #${t}`, icon: 'calendar', onSelect: () => setFilter({ id: `tag:${t}`, kind: 'tag', value: t, label: `#${t}` }) },
             { label: 'Remove', icon: 'x', danger: true, onSelect: () => save({ tags: (e.tags || []).filter((x) => x !== t), activities: (e.activities || []).filter((x) => x !== t) }) },
           ])}>#${t}</button>`)}
-          <button class="je-prop is-add" onClick=${(ev) => setPop({ kind: 'tags', anchor: ev.currentTarget })}><${Icon} name="hash" size=${14} />${tagsOf(e).length ? '' : 'Tag'}</button>
+          <button class="je-prop is-add" aria-label="Add a tag" onClick=${(ev) => setPop({ kind: 'tags', anchor: ev.currentTarget })}><${Icon} name="hash" size=${14} />${tagsOf(e).length ? '' : 'Tag'}</button>
         </div>
+
+        ${pinned.length > 0 && html`<div class="je-pins">${pinned.map((c) => html`<${CardPin} key=${c.id} card=${c} onClick=${() => jumpTo(c.id)} />`)}</div>`}
 
         ${e.photos?.length > 0 && html`<div class="je-photos">
           ${e.photos.map((p) => html`<button key=${p.id} class="je-photo" style=${{ backgroundImage: `url(${p.url})` }}
@@ -479,30 +532,10 @@ function EntryView({ day, entry, byDay, go, pick, toggleSide, collapsed, openImp
           ${st.mode === 'server' && html`<button class="je-photo is-add" aria-label="Add photos" onClick=${addPhotos}>${busy === 'photo' ? html`<span class="spinner sm" />` : html`<${Icon} name="plus" size=${18} />`}</button>`}
         </div>`}
 
-        <section class="je-section">
-          <div class="je-section-head">
-            <h2>Moments</h2>
-            <span class="spacer" />
-            ${!e.photos?.length && st.mode === 'server' && html`<button class="je-mini" onClick=${addPhotos}>${busy === 'photo' ? html`<span class="spinner sm" />` : html`<${Icon} name="image" size=${13} />`}Photo</button>`}
-            <button class="je-mini" onClick=${(ev) => openMenu(ev.currentTarget, CARD_TYPES.map((t) => ({
-              label: t.label, glyph: html`<span class="menu-emoji">${t.emoji}</span>`,
-              onSelect: () => { const c = { id: uid('c'), type: t.id }; save({ cards: [...(e.cards || []), c] }); setTimeout(() => { const el = document.querySelector(`[data-card="${c.id}"]`); el && setPop({ kind: 'card', id: c.id, anchor: el }); }, 60); },
-            })), { placement: 'bottom-end', width: 220 })}><${Icon} name="plus" size=${13} />Add</button>
-          </div>
-          ${e.cards?.length ? html`<div class="je-cards">
-            ${e.cards.map((c) => html`<div key=${c.id} data-card=${c.id} class=${cx('je-card-slot', CARD_TYPES.find((t) => t.id === c.type)?.wide && 'is-wide', c.type === 'ride' && 'is-ride')}>
-              <${Card} card=${c} onClick=${(ev) => setPop({ kind: 'card', id: c.id, anchor: ev.currentTarget })} />
-            </div>`)}
-          </div>` : html`<button class="je-placeholder" onClick=${(ev) => enrich(ev.currentTarget)}>
-            <${Icon} name="sparkle" size=${14} />Flights, races, places and rides show up here — add one, or let AI find them in your entry.
-          </button>`}
-        </section>
-
-        <section class="je-section">
-          <div class="je-section-head"><h2>The day</h2></div>
-          <${RichEditor} docKey=${day} html=${entryHtml(entry)} class="je-rich" placeholder="What happened today?"
-            autofocus=${isToday(d) && !e.text}
-            onChange=${(h, key) => { saveEntry(key, { html: h }); }} />
+        <section class="je-section je-story">
+          <${RichEditor} docKey=${day} html=${entryHtml(entry)} class="je-rich" placeholder="What happened today? Type / to add a flight, ride, place…"
+            autofocus=${isToday(d) && !e.text} embed=${embed} extraBlocks=${cardBlocks} onReady=${(api) => { editor.current = api; }}
+            onChange=${(h) => { saveEntry(day, { html: h }); }} />
         </section>
 
         <${FoodLog} entry=${e} save=${save} busy=${busy === 'food'} onSmart=${smartFood} />
@@ -511,8 +544,8 @@ function EntryView({ day, entry, byDay, go, pick, toggleSide, collapsed, openImp
           <div class="je-section-head"><h2>On this day</h2></div>
           <div class="je-memory-list">
             ${memories.map((m) => html`<button key=${m.key} class="je-memory" onClick=${() => pick(m.key)}>
-              <span class="je-memory-icon" style=${m.e.photos?.[0] ? { backgroundImage: `url(${m.e.photos[0].url})` } : null}>${m.e.photos?.[0] ? '' : m.e.icon || moodInfo(moodOf(m.e))?.face || '📓'}</span>
-              <span class="je-memory-text"><b>${m.label}</b><span>${m.e.title || (m.e.text || '').slice(0, 120)}</span></span>
+              <span class="je-memory-icon" style=${m.e.photos?.[0] ? { backgroundImage: `url(${m.e.photos[0].url})` } : null}>${m.e.photos?.[0] ? '' : m.e.icon || html`<${Icon} name="book" size=${16} />`}</span>
+              <span class="je-memory-text"><b>${m.label}</b><span>${(m.e.text || '').slice(0, 120)}</span></span>
             </button>`)}
           </div>
         </section>`}
@@ -528,17 +561,10 @@ function EntryView({ day, entry, byDay, go, pick, toggleSide, collapsed, openImp
     ${pop?.kind === 'card' && (() => {
       const c = e.cards?.find((x) => x.id === pop.id);
       return c && html`<${CardEditor} key=${c.id} anchor=${pop.anchor} card=${c} onClose=${() => setPop(null)}
-        onSave=${(next) => save({ cards: (get('journal', day)?.cards || []).map((x) => (x.id === c.id ? { ...next, id: c.id } : x)) })}
-        onDelete=${() => save({ cards: (get('journal', day)?.cards || []).filter((x) => x.id !== c.id) })} />`;
+        onSave=${(next) => save({ cards: cardsNow().map((x) => (x.id === c.id ? { ...next, id: c.id } : x)) })}
+        onDelete=${() => deleteCard(c.id)} />`;
     })()}
   </div>`;
-}
-
-function TitleField({ value, onSave }) {
-  const [v, setV] = useState(value);
-  useEffect(() => setV(value), [value]);
-  return html`<input class="je-title" placeholder="Add a title" value=${v} onInput=${(ev) => setV(ev.target.value)}
-    onBlur=${() => v.trim() !== value && onSave(v.trim())} onKeyDown=${(ev) => { if (ev.key === 'Enter') ev.target.blur(); }} />`;
 }
 
 function Stars({ value, onChange }) {
@@ -597,11 +623,11 @@ function FoodLog({ entry: e, save, busy, onSmart }) {
       <h2>Food</h2>
       ${sum.items > 0 && html`<span class="je-food-sum">${plural(sum.items, 'item')}${sum.drinks ? ` · ${plural(sum.drinks, 'drink')}` : ''}${sum.estimated ? ` · ~${sum.kcal.toLocaleString()} kcal` : ''}</span>`}
       <span class="spacer" />
-      <button class="je-mini" disabled=${busy} onClick=${(ev) => onSmart(ev.currentTarget)}>${busy ? html`<span class="spinner sm" />` : html`<${Icon} name="sparkle" size=${13} />`}Smart</button>
+      <button class="je-mini" disabled=${busy} onClick=${(ev) => onSmart(ev.currentTarget)}>${busy ? html`<span class="spinner sm" />` : html`<${Icon} name="sparkle" size=${13} />`}Tidy with AI</button>
     </div>
     <div class="je-meals">
       ${MEALS.map((m) => html`<div key=${m.id} class="je-meal">
-        <div class="je-meal-label"><span>${m.emoji}</span>${m.label}</div>
+        <div class="je-meal-label"><${Icon} name=${m.icon} size=${15} />${m.label}</div>
         <div class="je-meal-items">
           ${(meals[m.id] || []).map((f) => html`<button key=${f.id} class=${cx('je-food-item', `is-${f.kind}`)} onClick=${(ev) => setEdit({ meal: m.id, id: f.id, anchor: ev.currentTarget })}>
             <span class="je-food-emoji">${f.emoji}</span>${foodLabel(f)}${f.zero && html`<em>zero</em>`}

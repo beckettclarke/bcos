@@ -33,6 +33,18 @@ export function sanitize(dirty) {
       if (DROP.has(tag)) continue;
       tag = RENAME[tag] || tag;
       if (node.nodeName === 'SPAN' && /font-weight:\s*(bold|[6-9]00)/.test(node.getAttribute('style') || '')) tag = 'STRONG';
+      // An embedded card (Journal): kept as an empty, non-editable placeholder
+      // that the host app renders into.
+      if (tag === 'FIGURE') {
+        const id = node.getAttribute('data-card') || '';
+        if (/^[\w-]{1,80}$/.test(id)) {
+          const fig = document.createElement('figure');
+          fig.setAttribute('data-card', id);
+          fig.setAttribute('contenteditable', 'false');
+          dst.appendChild(fig);
+        }
+        continue;
+      }
       if (!KEEP.has(tag)) { walk(node, dst); continue; }
       const el = document.createElement(tag);
       if (tag === 'A') {
@@ -177,6 +189,7 @@ export function toMarkdown(htmlStr) {
       case 'BLOCKQUOTE': return `> ${inline(n)}\n\n`;
       case 'PRE': return `\`\`\`\n${n.textContent.replace(/\n$/, '')}\n\`\`\`\n\n`;
       case 'HR': return '---\n\n';
+      case 'FIGURE': return n.dataset.card ? `{{card ${n.dataset.card}}}\n\n` : '';
       case 'UL':
       case 'OL': {
         const check = n.classList.contains('checklist');
@@ -375,9 +388,11 @@ function wrapInline(tag, root) {
 
 /**
  * props: docKey, html, onChange(html), placeholder, toolbar, class,
- * onOpenNote(id), autofocus, readOnly, onReady(api)
+ * onOpenNote(id), autofocus, readOnly, onReady(api),
+ * embed(el, id) — renders into each <figure data-card> placeholder,
+ * extraBlocks — more "/" menu items: { id, label, icon, hint, keys, run() }
  */
-export function RichEditor({ docKey, html: source, onChange, placeholder = 'Start writing…', toolbar = false, class: cls, onOpenNote, autofocus, readOnly = false, onReady, onHeadings }) {
+export function RichEditor({ docKey, html: source, onChange, placeholder = 'Start writing…', toolbar = false, class: cls, onOpenNote, autofocus, readOnly = false, onReady, onHeadings, embed, extraBlocks }) {
   const rootRef = useRef(null);
   const changeRef = useRef(onChange);
   changeRef.current = onChange;
@@ -446,7 +461,32 @@ export function RichEditor({ docKey, html: source, onChange, placeholder = 'Star
       focus: () => rootRef.current?.focus(),
       insertHtml: (h) => { rootRef.current?.focus(); exec('insertHTML', h); emit(); },
       root: () => rootRef.current,
+      hasCaret: () => { const sel = window.getSelection(); return !!(sel.rangeCount && rootRef.current?.contains(sel.anchorNode)); },
+      changed: () => emit(true),
     });
+  }, [docKey]);
+
+  // Embedded cards: render into every placeholder now, and into any that
+  // appear later (undo, paste, a block command).
+  const embedRef = useRef(embed);
+  embedRef.current = embed;
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || !embedRef.current) return;
+    root.querySelectorAll('figure[data-card]').forEach((el) => embedRef.current(el, el.dataset.card));
+  });
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || !embed) return;
+    const mo = new MutationObserver((list) => {
+      for (const m of list) for (const n of m.addedNodes) {
+        if (n.nodeType !== 1) continue;
+        const figs = n.matches?.('figure[data-card]') ? [n] : [...n.querySelectorAll?.('figure[data-card]') || []];
+        figs.forEach((el) => { if (!el.childNodes.length) embedRef.current?.(el, el.dataset.card); });
+      }
+    });
+    mo.observe(root, { childList: true, subtree: true });
+    return () => mo.disconnect();
   }, [docKey]);
 
   // Selection-driven UI: toolbar state and the formatting bubble.
@@ -565,7 +605,7 @@ export function RichEditor({ docKey, html: source, onChange, placeholder = 'Star
     const m = menuRef.current;
     if (!m) return [];
     const q = m.query.toLowerCase();
-    if (m.kind === 'slash') return BLOCKS.filter((b) => !q || b.label.toLowerCase().includes(q) || b.keys.includes(q));
+    if (m.kind === 'slash') return [...BLOCKS, ...(extraBlocks || [])].filter((b) => !q || b.label.toLowerCase().includes(q) || b.keys.includes(q));
     return all('notes').filter((n) => !n.trashed && (!q || (n.title || '').toLowerCase().includes(q))).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8)
       .map((n) => ({ id: n.id, label: n.title || 'Untitled', icon: 'note', hint: '' }));
   };
@@ -578,7 +618,8 @@ export function RichEditor({ docKey, html: source, onChange, placeholder = 'Star
     root.focus();
     const before = textBeforeCaret(m.block);
     deleteRange(rangeFromOffsets(m.block, m.start, before.length));
-    if (m.kind === 'slash') run(item.id);
+    if (m.kind === 'slash' && item.run) { item.run(); emit(); }
+    else if (m.kind === 'slash') run(item.id);
     else {
       exec('insertHTML', `<a data-note="${escapeHtml(item.id)}" href="#" contenteditable="false" class="note-link">${escapeHtml(item.label)}</a>&nbsp;`);
       emit();

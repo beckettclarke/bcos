@@ -10,10 +10,12 @@ description: >-
   calendar, tasks, notes, journal and mail. Everything you write is stored on
   your Umbrel and syncs to every device you open it on.
 releaseNotes: >-
-  A rebuilt Journal: an endless month sidebar with photos, icons and mood
-  dots plus filters; day icons, titles, ratings and a 7-point mood; smart
-  cards for flights, races, workouts, places and rides; a food log with
-  icons; and import from Diarly (AI reads your files one at a time) or JSON.
+  A rebuilt Journal: an endless month sidebar with photos, icons and filters;
+  day icons, ratings and a 7-point mood; smart cards (flights, races,
+  workouts, places, rides, orders, appointments) that sit inline in the
+  day's timeline, with brand logos via logo.dev; a food log; and import from
+  Diarly — AI reads three files at a time with a live preview, and the queue
+  is saved so rate-limited files can be retried — or from JSON.
   New in Settings → AI: connect OpenAI, Anthropic, Google, xAI, DeepSeek,
   Qwen, Kimi, GLM, Mistral, OpenRouter, NVIDIA NIM, Groq, Ollama or any
   OpenAI-compatible API, and make presets for each AI feature.

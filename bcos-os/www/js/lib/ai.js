@@ -109,6 +109,46 @@ export function parseJSON(text) {
   catch { throw new Error('The model’s JSON was cut off or invalid — try again or use a bigger model'); }
 }
 
+/**
+ * Like chat(), but streams: onText(fullTextSoFar) is called as the answer
+ * arrives. Errors carry `.status` (401 bad key, 429 rate limited).
+ */
+export async function chatStream(preset, { system, prompt, messages, json = false, maxTokens, signal }, onText) {
+  if (!preset) throw new Error('No AI preset — add one in Settings → AI');
+  if (status.mode !== 'server') throw new Error('AI needs the BCOS server');
+  let res;
+  try {
+    res = await fetch('api/ai/stream', {
+      method: 'POST', credentials: 'same-origin', signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: preset.provider, model: preset.model, temperature: preset.temperature ?? undefined, system, messages: messages || [{ role: 'user', content: prompt }], json, maxTokens }),
+    });
+  } catch (err) { throw Object.assign(new Error(err.name === 'AbortError' ? 'Cancelled' : 'Couldn’t reach your Umbrel'), { status: err.name === 'AbortError' ? 499 : 503 }); }
+  if (!res.ok || !res.body) {
+    let msg = `Something went wrong (${res.status})`;
+    try { msg = (await res.json()).error || msg; } catch {}
+    throw Object.assign(new Error(msg), { status: res.status });
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '', text = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let nl;
+    while ((nl = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, nl);
+      buf = buf.slice(nl + 1);
+      if (!line.trim()) continue;
+      const m = JSON.parse(line);
+      if (m.error) throw Object.assign(new Error(m.error), { status: m.status });
+      if (m.d) { text += m.d; onText?.(text); }
+    }
+  }
+  return json ? parseJSON(text) : text;
+}
+
 /** Run one chat with a specific preset. Resolves text, or parsed JSON when json is set. */
 export async function chat(preset, { system, prompt, messages, json = false, maxTokens, timeout = 240000 }) {
   if (!preset) throw new Error('No AI preset — add one in Settings → AI');

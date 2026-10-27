@@ -43,6 +43,7 @@ export default function SettingsApp({ intent, nonce }) {
   const [q, setQ] = useState('');
   const [info, setInfo] = useState(null);
   const [nameDraft, setNameDraft] = useState(s.name);
+  const [logoKey, setLogoKey] = useState(s.logoDevKey || '');
 
   useEffect(() => {
     let alive = true;
@@ -132,6 +133,13 @@ export default function SettingsApp({ intent, nonce }) {
       control: html`<button class="btn btn-sm" onClick=${() => setTab('ai')}>Manage</button>`,
     },
     {
+      id: 'logos', tab: 'apps', icon: 'image', title: 'Brand logos',
+      desc: html`Shows Uber, airline, store and restaurant logos on Journal cards. Paste a publishable key from <a class="settings-link" href="https://www.logo.dev" target="_blank" rel="noopener noreferrer">logo.dev</a>`,
+      control: html`<input class="field field-sm settings-name" placeholder="pk_…" spellcheck="false" autocomplete="off" value=${logoKey} onInput=${(e) => setLogoKey(e.target.value)}
+        onBlur=${() => logoKey.trim() !== (s.logoDevKey || '') && (setSettings({ logoDevKey: logoKey.trim() }), toast(logoKey.trim() ? 'Logo key saved' : 'Logo key removed', { icon: 'image' }))}
+        onKeyDown=${(e) => e.key === 'Enter' && e.target.blur()} />`,
+    },
+    {
       id: 'sync', tab: 'data', icon: st.mode === 'local' ? 'database' : st.online ? 'cloud-check' : 'cloud-off', title: 'Sync',
       desc: st.mode === 'local' ? 'Saved in this browser only — run BCOS on your Umbrel to sync' : st.online ? `Everything is saved on your Umbrel${st.lastSync ? ' and up to date' : ''}` : 'Offline — changes are queued and will sync automatically',
       control: html`<span class=${cx('sync-pill', st.mode === 'local' ? 'is-muted' : st.online ? 'is-ok' : 'is-warn')}>${st.mode === 'local' ? 'Local' : st.online ? 'Synced' : 'Offline'}</span>`,
@@ -161,7 +169,7 @@ export default function SettingsApp({ intent, nonce }) {
   ];
 
   const query = q.trim().toLowerCase();
-  const shown = rows.filter((r) => (tab === 'all' || r.tab === tab) && (!query || `${r.title} ${r.desc}`.toLowerCase().includes(query)));
+  const shown = rows.filter((r) => (tab === 'all' || r.tab === tab) && (!query || `${r.title} ${typeof r.desc === 'string' ? r.desc : 'logo.dev'}`.toLowerCase().includes(query)));
   const groups = tab === 'all' && !query
     ? [['account', 'appearance'], ['apps'], ['data']].map((tabs) => shown.filter((r) => tabs.includes(r.tab))).filter((g) => g.length)
     : [shown];

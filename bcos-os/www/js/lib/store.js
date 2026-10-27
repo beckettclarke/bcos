@@ -27,6 +27,7 @@ export const DEFAULT_SETTINGS = {
   tasks: { completed: 'section' },
   notes: { sort: 'edited', view: 'list', font: 'sans' },
   journal: { font: 'sans', showFood: true },
+  logoDevKey: '', // publishable key from logo.dev, for brand logos on Journal cards
   // AI: presets pair a provider with a model; `tasks` maps each AI feature to
   // a preset id, 'default' or 'ask'. Keys live on the server, never here.
   ai: { presets: [], defaultPreset: 'ask', tasks: {} },
